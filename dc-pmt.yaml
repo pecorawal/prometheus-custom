@@ -1,0 +1,78 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+ creationTimestamp: null
+ generation: 1
+ labels:
+   app: prometheus-mon
+ name: prometheus-mon
+spec:
+ replicas: 1
+ revisionHistoryLimit: 10
+ selector:
+   app: prometheus-mon
+   deploymentconfig: prometheus-mon
+ strategy:
+   activeDeadlineSeconds: 21600
+   resources: {}
+   rollingParams:
+     intervalSeconds: 1
+     maxSurge: 25%
+     maxUnavailable: 25%
+     timeoutSeconds: 600
+     updatePeriodSeconds: 1
+   type: Rolling
+ template:
+   metadata:
+     creationTimestamp: null
+     labels:
+       app: prometheus-mon
+       deploymentconfig: prometheus-mon
+   spec:
+     containers:
+     - args:
+       - --web.console.templates=/etc/prometheus/consoles
+       - --web.console.libraries=/etc/prometheus/console_libraries
+       - --config.file=/etc/prometheus/prometheus.yml
+       - --storage.tsdb.path=/prometheus
+       - --storage.tsdb.retention=365d
+       - --storage.tsdb.wal-compression
+       - --web.enable-lifecycle
+       - --storage.tsdb.no-lockfile
+       - --web.listen-address=0.0.0.0:9090
+       image: docker-registry.default.svc:5000/openshift/prometheus:latest
+       imagePullPolicy: Always
+       name: prometheus-mon
+       ports:
+       - containerPort: 9090
+         protocol: TCP
+       resources:
+         limits:
+           cpu: "2"
+           memory: 4Gi
+         requests:
+           cpu: 500m
+           memory: 4Gi
+       terminationMessagePath: /dev/termination-log
+       terminationMessagePolicy: File
+       volumeMounts:
+       - mountPath: /prometheus
+         name: prometheus-storage
+       - mountPath: /etc/prometheus
+         name: prometheus-config
+     dnsPolicy: ClusterFirst
+     restartPolicy: Always
+     schedulerName: default-scheduler
+     securityContext: {}
+     terminationGracePeriodSeconds: 30
+     volumes:
+     - name: prometheus-storage
+       persistentVolumeClaim:
+         claimName: prometheus-data
+     - configMap:
+         defaultMode: 420
+         name: prometheus-config
+       name: prometheus-config
+ test: false
+ triggers:
+ - type: ConfigChange
